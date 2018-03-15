@@ -1,0 +1,64 @@
+# -*- coding: cp936 -*-
+import pandas as pd
+import numpy as np
+
+
+def data_preparation(data_file):
+    data = pd.read_csv(data_file)
+    data['future'] = data['close']
+    for i in range(len(data)-1):
+        data['future'][i] = data['close'][i+1]
+    data['decision'] = 0
+    for i in range(len(data)):
+        if 1.005*data['close'][i]<data['future'][i]:
+            data['decision'][i]=1
+        elif 0.995*data['close'][i]>data['future'][i]:
+            data['decision'][i]=-1
+
+    data = data[['pre_close', 'open', 'high', 'low', 'close', 'volume',
+       'amt', 'chg', 'pct_chg', 'swing', 'vwap', 'ADTM', 'ATR', 'BBI',
+       'BIAS', 'BOLL', 'CCI', 'CDP', 'DMA', 'DMI', 'DPO', 'ENV',
+       'EXPMA', 'KDJ', 'slowKD', 'MA', 'MACD', 'MIKE', 'MTM',
+       'PRICEOSC', 'PVT', 'RC', 'ROC', 'RSI', 'SAR', 'SI', 'SOBV',
+       'SRMI', 'STD', 'TAPI', 'TRIX', 'VHF', 'VMA', 'VMACD', 'VOSC',
+       'VSTD', 'WVAD', 'vol_ratio', 'up_days', 'down_days',
+       'breakout_ma', 'breakdown_ma', 'bull_bear_ma', 'history_low',
+       'stage_high', 'history_high', 'stage_low',
+       'decision']]
+
+    data = data.dropna()  #处理缺失值
+
+
+   
+    from scipy.stats import pearsonr
+    from sklearn.preprocessing import MinMaxScaler   #使用区间缩放法对所有特征进行归一化处理
+    features = ['pre_close', 'open', 'high', 'low', 'close', 'volume',
+       'amt', 'chg', 'pct_chg', 'swing', 'vwap', 'ADTM', 'ATR', 'BBI',
+       'BIAS', 'BOLL', 'CCI', 'CDP', 'DMA', 'DMI', 'DPO', 'ENV',
+       'EXPMA', 'KDJ', 'slowKD', 'MA', 'MACD', 'MIKE', 'MTM',
+       'PRICEOSC', 'PVT', 'RC', 'ROC', 'RSI', 'SAR', 'SI', 'SOBV',
+       'SRMI', 'STD', 'TAPI', 'TRIX', 'VHF', 'VMA', 'VMACD', 'VOSC',
+       'VSTD', 'WVAD', 'vol_ratio', 'up_days', 'down_days',
+       'breakout_ma', 'breakdown_ma', 'bull_bear_ma', 'history_low',
+       'stage_high', 'history_high', 'stage_low']
+    data_features = data[features]
+    data_features_MM = MinMaxScaler().fit_transform(data_features)
+    data[features] = data_features_MM
+
+    #使用sklearn库中的PCA方法，从原始数据集的特征中提取30个作为最终的输入变量
+    from sklearn.decomposition import PCA
+    features_PCA = PCA(n_components=30).fit_transform(data[features])
+    features_PCA_pd = pd.DataFrame(features_PCA)
+    decision = data['decision'] 
+    decision = pd.DataFrame(decision)
+    decision.index = features_PCA_pd.index
+
+    
+    #将PCA提取出来的30个特征变量和指标变量“decision”合并在一起，构成最终的数据集
+    data = pd.merge(features_PCA_pd,decision,left_index=True,right_index=True)
+
+    #将数据按照8：2的比例随机切分为训练数据和测试数据
+    import graphlab as gl
+    data = gl.SFrame(data)
+    train_data ,test_data = data.random_split(0.8)
+    return train_data, test_data
